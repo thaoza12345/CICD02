@@ -1,5 +1,3 @@
-name: Node.js CI with Docker Build
-
 on:
   push:
     branches: [ "main" ]
@@ -21,9 +19,9 @@ jobs:
         run: npm install
         working-directory: electricity-api-v2
       
-      - name: Run Unit Tests # <--- NEW STEP
+      - name: Run Unit Tests
         run: npm test
-        working-directory : electricity-api-v2
+        working-directory: electricity-api-v2
 
       - name: Lint check (Syntax Check)
         run: node --check index.js
@@ -34,12 +32,14 @@ jobs:
           docker build -t electricity-api:${{ github.sha }} .
           echo "Build successful"
         working-directory: electricity-api-v2
+
   build-and-push:
-    needs: test # <--- This job ONLY runs if the "test" job passes!
+    needs: test
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Build Docker Image
-    run: |
-      docker build -t electricity-api:prod-${{ github.sha }} .
-      echo "Production image built successfully."
+      - uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build -t electricity-api:prod-${{ github.sha }} .
+          echo "Production image built successfully."
