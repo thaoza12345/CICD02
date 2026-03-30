@@ -6,8 +6,10 @@ const PORT = process.env.PORT || 3000;
 const loadData = (file) =>
   JSON.parse(fs.readFileSync(`./data/${file}`, "utf8"));
 // 1. API: Total electricity usage for each year
-app.get("/api/usage/total-by-year", (req, res) => {
+// 1. total usage
+app.get("/api/usages/totalyear", (req, res) => {
   const data = loadData("electricity_usages_en.json");
+
   const totals = data.reduce((acc, curr) => {
     const year = curr.year;
     const totalUsage = Object.keys(curr)
@@ -17,11 +19,13 @@ app.get("/api/usage/total-by-year", (req, res) => {
     acc[year] = (acc[year] || 0) + totalUsage;
     return acc;
   }, {});
-  res.json(totals);
+
+  res.status(200).json(totals);
 });
-// 2. API: Total electricity users for each year
-app.get("/api/users/total-by-year", (req, res) => {
+// 2. total users
+app.get("/api/users/totalyear", (req, res) => {
   const data = loadData("electricity_users_en.json");
+
   const totals = data.reduce((acc, curr) => {
     const year = curr.year;
     const totalUsers = Object.keys(curr)
@@ -31,36 +35,68 @@ app.get("/api/users/total-by-year", (req, res) => {
     acc[year] = (acc[year] || 0) + totalUsers;
     return acc;
   }, {});
-  res.json(totals);
+
+  res.status(200).json(totals);
 });
-// 3. API: Usage by province and year
+// 3. usage province/year + validate year
 app.get("/api/usage/:province/:year", (req, res) => {
   const { province, year } = req.params;
+
+  if (isNaN(year)) {
+    return res.status(400).json({ message: "Invalid year" });
+  }
+
   const data = loadData("electricity_usages_en.json");
+
   const result = data.find(
     (d) =>
-      d.province_name.toLowerCase() === province.toLowerCase() && d.year == year
+      d.province_name.toLowerCase() === province.toLowerCase() &&
+      d.year == year
   );
-  res.json(result || { message: "Data not found" });
+
+  if (!result) {
+    return res.status(404).json({ message: "Data not found" });
+  }
+
+  res.status(200).json(result);
 });
-// 4. API: Users by province and year
-app.get("/api/users/:province/:year", (req, res) => {
+// 4. users province/year
+app.get("/api/user/:province/:year", (req, res) => {
   const { province, year } = req.params;
+
   const data = loadData("electricity_users_en.json");
+
   const result = data.find(
     (d) =>
-      d.province_name.toLowerCase() === province.toLowerCase() && d.year == year
+      d.province_name.toLowerCase() === province.toLowerCase() &&
+      d.year == year
   );
-  res.json(result || { message: "Data not found" });
+
+  if (!result) {
+    return res.status(404).json({ message: "Data not found" });
+  }
+
+  res.status(200).json({
+    province,
+    year,
+    users: result,
+  });
 });
-// 5. API: Usage history for a specific province
-app.get("/api/part_usage/history/:province", (req, res) => {
+// 5. past users (rename route ให้ตรง test)
+app.get("/api/pastusers/:province", (req, res) => {
   const { province } = req.params;
-  const data = loadData("electricity_usages_en.json");
+
+  const data = loadData("electricity_users_en.json");
+
   const result = data.filter(
     (d) => d.province_name.toLowerCase() === province.toLowerCase()
   );
-  res.json(result);
+
+  if (result.length === 0) {
+    return res.status(404).json({ message: "Province not found" });
+  }
+
+  res.status(200).json(result);
 });
 // 6. API: User history for a specific province
 app.get("/api/part_users/history/:province", (req, res) => {

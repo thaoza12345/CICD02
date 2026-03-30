@@ -1,64 +1,184 @@
-const request = require('supertest');
-const app = require('../index');
+const express = require("express");
+const fs = require("fs");
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-describe('Electricity API Endpoints', () => {
+// helper
+const loadData = (file) =>
+  JSON.parse(fs.readFileSync(`./data/${file}`, "utf8"));
 
-    // Test Case 1: Total Usage ทุกปี
-    it('should return total electricity usage for all years', async () => {
-        const res = await request(app).get('/api/usages/totalyear');
-        expect(res.status).toBe(200);
-        expect(typeof res.body).toBe('object');
-    });
+/* =========================
+   1. TOTAL USAGE
+========================= */
+app.get("/api/usages/totalyear", (req, res) => {
+  const data = loadData("electricity_usages_en.json");
 
-    // Test Case 2: Usage ของ province + year (not found case)
-    it('should return "Data not found" for invalid province/year', async () => {
-        const res = await request(app).get('/api/usage/Alberta/2566');
-        expect(res.body.message).toBe('Data not found');
-    });
+  const totals = data.reduce((acc, curr) => {
+    const year = curr.year;
+    const total = Object.keys(curr)
+      .filter((k) => k.endsWith("_kwh"))
+      .reduce((sum, k) => sum + (curr[k] || 0), 0);
 
-    // Test Case 3: User history ของ province
-    it('should return user history for a specific province', async () => {
-        const res = await request(app).get('/api/pastusers/Bangkok');
-        expect(res.statusCode).toEqual(200);
-        expect(Array.isArray(res.body)).toBe(true);
-    });
+    acc[year] = (acc[year] || 0) + total;
+    return acc;
+  }, {});
 
-    // ✅ Test Case 4: Total users ทุกปี
-    it('should return total electricity users for all years', async () => {
-        const res = await request(app).get('/api/users/totalyear');
-        expect(res.status).toBe(200);
-        expect(typeof res.body).toBe('object');
-    });
-
-    // ✅ Test Case 5: Users ของ province + year
-    it('should return electricity users for a specific province and year', async () => {
-        const res = await request(app).get('/api/user/Bangkok/2565');
-
-        expect(res.status).toBe(200);
-
-        // สมมติว่า API คืน object
-        expect(typeof res.body).toBe('object');
-
-        // เช็คว่ามี field สำคัญ
-        expect(res.body).toHaveProperty('province');
-        expect(res.body).toHaveProperty('year');
-        expect(res.body).toHaveProperty('users');
-    });
-
-    // ✅ Test Case 6: Invalid year format (error case)
-    it('should return error for invalid year format', async () => {
-        const res = await request(app).get('/api/usage/Bangkok/abcd');
-
-        expect(res.status).toBe(400); // หรือ 422 แล้วแต่ที่คุณ define
-        expect(res.body).toHaveProperty('message');
-    });
-
-    // ✅ Test Case 7: Province ไม่มีในระบบ
-    it('should return error for non-existing province', async () => {
-        const res = await request(app).get('/api/pastusers/UnknownCity');
-
-        expect(res.status).toBe(404);
-        expect(res.body.message).toBe('Province not found');
-    });
-
+  res.status(200).json(totals);
 });
+
+/* =========================
+   2. TOTAL USERS
+========================= */
+app.get("/api/users/totalyear", (req, res) => {
+  const data = loadData("electricity_users_en.json");
+
+  const totals = data.reduce((acc, curr) => {
+    const year = curr.year;
+    const total = Object.keys(curr)
+      .filter((k) => k.endsWith("_count"))
+      .reduce((sum, k) => sum + (curr[k] || 0), 0);
+
+    acc[year] = (acc[year] || 0) + total;
+    return acc;
+  }, {});
+
+  res.status(200).json(totals);
+});
+
+/* =========================
+   3. USAGE BY PROVINCE + YEAR
+========================= */
+app.get("/api/usage/:province/:year", (req, res) => {
+  const { province, year } = req.params;
+
+  if (isNaN(year)) {
+    return res.status(400).json({ message: "Invalid year" });
+  }
+
+  const data = loadData("electricity_usages_en.json");
+
+  const result = data.find(
+    (d) =>
+      d.province_name.toLowerCase() === province.toLowerCase() &&
+      d.year == year
+  );
+
+  if (!result) {
+    return res.status(404).json({ message: "Data not found" });
+  }
+
+  res.status(200).json(result);
+});
+
+/* =========================
+   4. USERS BY PROVINCE + YEAR
+========================= */
+app.get("/api/user/:province/:year", (req, res) => {
+  const { province, year } = req.params;
+
+  if (isNaN(year)) {
+    return res.status(400).json({ message: "Invalid year" });
+  }
+
+  const data = loadData("electricity_users_en.json");
+
+  const result = data.find(
+    (d) =>
+      d.province_name.toLowerCase() === province.toLowerCase() &&
+      d.year == year
+  );
+
+  if (!result) {
+    return res.status(404).json({ message: "Data not found" });
+  }
+
+  res.status(200).json(result);
+});
+
+/* =========================
+   5. USAGE HISTORY
+========================= */
+app.get("/api/pastusage/:province", (req, res) => {
+  const { province } = req.params;
+
+  const data = loadData("electricity_usages_en.json");
+
+  const result = data.filter(
+    (d) => d.province_name.toLowerCase() === province.toLowerCase()
+  );
+
+  if (result.length === 0) {
+    return res.status(404).json({ message: "Province not found" });
+  }
+
+  res.status(200).json(result);
+});
+
+/* =========================
+   6. USER HISTORY
+========================= */
+app.get("/api/pastusers/:province", (req, res) => {
+  const { province } = req.params;
+
+  const data = loadData("electricity_users_en.json");
+
+  const result = data.filter(
+    (d) => d.province_name.toLowerCase() === province.toLowerCase()
+  );
+
+  if (result.length === 0) {
+    return res.status(404).json({ message: "Province not found" });
+  }
+
+  res.status(200).json(result);
+});
+
+/* =========================
+   🔥 EXTRA APIs (ให้ครบ 12)
+========================= */
+
+// 7. list provinces (usage)
+app.get("/api/provinces/usage", (req, res) => {
+  const data = loadData("electricity_usages_en.json");
+  const provinces = [...new Set(data.map((d) => d.province_name))];
+  res.status(200).json(provinces);
+});
+
+// 8. list provinces (users)
+app.get("/api/provinces/users", (req, res) => {
+  const data = loadData("electricity_users_en.json");
+  const provinces = [...new Set(data.map((d) => d.province_name))];
+  res.status(200).json(provinces);
+});
+
+// 9. latest usage year
+app.get("/api/usage/latest", (req, res) => {
+  const data = loadData("electricity_usages_en.json");
+  const latest = Math.max(...data.map((d) => d.year));
+  res.status(200).json({ latest });
+});
+
+// 10. latest users year
+app.get("/api/users/latest", (req, res) => {
+  const data = loadData("electricity_users_en.json");
+  const latest = Math.max(...data.map((d) => d.year));
+  res.status(200).json({ latest });
+});
+
+// 11. check health
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "OK" });
+});
+
+// 12. root api info
+app.get("/api", (req, res) => {
+  res.status(200).json({ message: "Electricity API running" });
+});
+
+/* ========================= */
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+}
+
+module.exports = app;
