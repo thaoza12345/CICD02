@@ -6,6 +6,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: electricity-api-v2
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -16,26 +20,27 @@ jobs:
           node-version: 18
 
       - name: Install dependencies
-        run: npm install
-        working-directory: electricity-api-v2
-      
+        run: npm ci
+
       - name: Run Unit Tests
         run: npm test
-        working-directory: electricity-api-v2
 
       - name: Lint check (Syntax Check)
         run: node --check index.js
-        working-directory: electricity-api-v2
 
       - name: Build Docker Image
         run: |
           docker build -t electricity-api:${{ github.sha }} .
           echo "Build successful"
-        working-directory: electricity-api-v2
 
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: electricity-api-v2
+
     steps:
       - uses: actions/checkout@v3
 
